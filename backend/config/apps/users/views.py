@@ -4,7 +4,7 @@ from rest_framework import status
 from .serializers import UserSignupSerializer, UserLoginSerializer
 from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.tokens import RefreshToken
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 
 class SignupView(APIView):
     def post(self, request):
@@ -16,29 +16,29 @@ class SignupView(APIView):
 
 User = get_user_model()
 class LoginView(APIView):
+    permission_classes = [AllowAny]
     def post(self, request):
         serializer = UserLoginSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        user_data = serializer.validated_data
-        user = User.objects.get(username=user_data['username'])
+        if serializer.is_valid(raise_exception=True):
+            user = serializer.validated_data
+            refresh = RefreshToken.for_user(user)
+            access_token = refresh.access_token
+            response  = Response({'access':str(access_token), 'username':user.username})
+            response.set_cookie(
+                key='refresh_token',
+                value=str(refresh),
+                httponly=True,
+                secure=True,
+                samesite='Strict'
+            )
 
-        refresh = RefreshToken.for_user(user)
-        return Response(
-            {
-                'refresh':str(refresh),
-                'access': str(refresh.access_token),
-                'user':user_data
-            }, status=status.HTTP_200_OK
-        )
+            return response
+        return Response({'error': 'Invalid Credentials'}, status=status.HTTP_400_BAD_REQUEST)
 
 class LogoutView(APIView):
     permission_classes = [IsAuthenticated]
     def post(self, request):
-        try:
-          refresh_token = request.data.get('refresh')
-          token = RefreshToken(refresh_token)
-          token.blacklist()
-          return Response({"message": "Successfully logged out"}, status=status.HTTP_200_OK)
-        except Exception as e:
-            return Response({'error':str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        response = Response({'message':'Logged out successfully'})
+        response.delete_cookie('refresh_token')
+        return response
     

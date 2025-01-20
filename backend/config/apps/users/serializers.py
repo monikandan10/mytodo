@@ -115,8 +115,4 @@ class UserLoginSerializer(serializers.Serializer):
         if not user.is_active:
             raise AuthenticationFailed('User account is disabled')
 
-        return {
-            'username':user.username,
-            'email':user.email,
-            'phone_number':user.phone_number
-        }
+        return user
